@@ -1,142 +1,303 @@
 // (c) Andrew
 // Icon by dunedhel: http://dunedhel.deviantart.com/
 // Supporting functions by AdThwart - T. Joseph
-var version = (function () {
-	var xhr = new XMLHttpRequest();
-	xhr.open('GET', chrome.extension.getURL('manifest.json'), false);
-	xhr.send(null);
-	return JSON.parse(xhr.responseText).version;
-}());
-var bkg = chrome.extension.getBackgroundPage();
-var error = false;
-var oldglobalstate = false;
-var settingnames = [];
-document.addEventListener('DOMContentLoaded', function () {
-	$("#tabs").tabs();
-	$("#o1").slider({min: 0, max: 1, step: 0.05, slide: function(event, ui) { $("#opacity1").val(ui.value); opacitytest(); }, stop: function(event, ui) { 
-		if (ui.value == 0) $("#collapseimageblock").show();
-		else $("#collapseimageblock").hide();
-		saveOptions();
-	}});
-	$("#o2").slider({min: 0, max: 1, step: 0.05, slide: function(event, ui) { $("#opacity2").val(ui.value); opacitytest(); }, stop: function(event, ui) { saveOptions(); }});
-	loadOptions();
-	colorPickLoad("s_bg");
-	colorPickLoad("s_text");
-	colorPickLoad("s_link");
-	colorPickLoad("s_table");
-	$(".i18_save, .i18_savecolours").click(saveOptions);
-	$(".i18_revertcolours").click(revertColours);
-	$(".i18_addwhitelist").click(function() { addList(0); });
-	$(".i18_addblacklist").click(function() { addList(1); });
-	$(".i18_dpoptions").click(function() { location.href='options.html'; });
-	$(".i18_clear").click(function() {
-		if ($(this).parent().find('strong').hasClass('i18_whitelist')) {
-			listclear(0);
-		} else {
-			listclear(1);
-		}
-	});
-	$("#enable, #enableToggle, #enableStickiness, #disableFavicons, #hidePageTitles, #showUnderline, #collapseimage, #removeBold, #showContext, #showIcon, #showUpdateNotifications").click(saveOptions);
-	$("#iconTitle, #customcss").blur(saveOptions);
-	$("#s_bg, #s_text, #s_link, #s_table").keyup(updateDemo);
-	$("#global").click(function() {
-		saveOptions();
-	});
-	$("#opacity1").blur(function() {
-		intValidate(this, 0.05);
-		if (this.value == 0) $("#collapseimageblock").show();
-		else $("#collapseimageblock").hide();
-		opacitytest();
-	});
-	$("#opacity2").blur(function() {
-		intValidate(this, 0.5);
-		opacitytest();
-	});
-	$("#maxwidth, #maxheight").blur(function() {
-		intValidate(this);
-	});
-	$("#pageTitleText").blur(pageTitleValidation);
-	$("#font").change(function() {
-		//if ($(this).val() == '-Unchanged-') $("#fontsize").parent().parent().hide();
-		//else $("#fontsize").parent().parent().show();
-		updateDemo();
-	});
-	// Hotkey
-	var listener;
-	var listener2;
-	var keysettings = {
-		is_solitary    : true,
-		is_unordered    : true,
-		is_exclusive    : true,
-		prevent_repeat  : true, 
-		is_sequence  : false,
-		is_counting  : false
-	};
-	listener = new window.keypress.Listener($("#hotkey"), keysettings);
-	listener.register_many(combos);
-	listener2 = new window.keypress.Listener($("#paranoidhotkey"), keysettings);
-	listener2.register_many(combos);
-	$("#hotkeyrecord").click(function() {
-		$("#hotkeyrecord").val(chrome.i18n.getMessage("hotkey_set"));
-		$("#hotkey").removeAttr('disabled').select().focus();
-	});
-	$("#paranoidhotkeyrecord").click(function() {
-		$("#paranoidhotkeyrecord").val(chrome.i18n.getMessage("hotkey_set"));
-		$("#paranoidhotkey").removeAttr('disabled').select().focus();
-	});
-	//
-	$("#iconType").change(function() {
-		$("#sampleicon").attr('src', '../img/addressicon/'+$(this).val()+'.png');
-	});
-	$("#fontsize").change(fontsizeValidation);
-	$("#newPages, #sfwmode, #font, #iconType").change(saveOptions);
-	$("#s_preset").change(function() {
-		stylePreset($(this).val());
-	});
-	$("#settingsall").click(settingsall);
-	$("#importsettings").click(settingsImport);
-	$("#savetxt").click(downloadtxt);
-	$(".i18_close").click(closeOptions);
+// CHANGED: Get version using the modern, synchronous API.
+const version = chrome.runtime.getManifest().version;
+
+// This is deprecated and must be replaced with `chrome.runtime.sendMessage`.
+// const bkg = chrome.extension.getBackgroundPage(); 
+
+let error = false;
+let oldglobalstate = false;
+
+
+document.addEventListener('DOMContentLoaded', async () => {
+    // Event listeners remain mostly the same
+    $("#tabs").tabs();
+    $("#o1").slider({min: 0, max: 1, step: 0.05, slide: (event, ui) => { $("#opacity1").val(ui.value); opacitytest(); }, stop: (event, ui) => { 
+        if (ui.value == 0) $("#collapseimageblock").show();
+        else $("#collapseimageblock").hide();
+        saveOptions();
+    }});
+    $("#o2").slider({min: 0, max: 1, step: 0.05, slide: (event, ui) => { $("#opacity2").val(ui.value); opacitytest(); }, stop: (event, ui) => { saveOptions(); }});
+    
+    // CHANGED: Call the new async loadOptions
+    await loadOptions();
+
+    colorPickLoad("s_bg");
+    colorPickLoad("s_text");
+    colorPickLoad("s_link");
+    colorPickLoad("s_table");
+
+    // Other event listeners
+    $(".i18_save, .i18_savecolours").click(saveOptions);
+    $(".i18_revertcolours").click(revertColours);
+    $(".i18_addwhitelist").click(() => addList(0));
+    $(".i18_addblacklist").click(() => addList(1));
+    $(".i18_dpoptions").click(() => { location.href='options.html'; });
+    $(".i18_clear").click(function() {
+        if ($(this).parent().find('strong').hasClass('i18_whitelist')) {
+            listclear(0);
+        } else {
+            listclear(1);
+        }
+    });
+
+    // Simplified event listeners
+    const elementsToSaveOnClick = "#enable, #enableToggle, #enableStickiness, #disableFavicons, #hidePageTitles, #showUnderline, #collapseimage, #removeBold, #showContext, #showIcon, #showUpdateNotifications, #global";
+    $(elementsToSaveOnClick).click(saveOptions);
+    $("#iconTitle, #customcss, #opacity1, #opacity2, #maxwidth, #maxheight, #pageTitleText").blur(saveOptions);
+    $("#s_bg, #s_text, #s_link, #s_table").keyup(updateDemo);
+    $("#font, #newPages, #sfwmode, #iconType, #fontsize").change(saveOptions);
+
+    $("#s_preset").change(function() {
+        stylePreset($(this).val());
+    });
+    
+    $("#iconType").change(function() {
+        $("#sampleicon").attr('src', '../img/addressicon/'+$(this).val()+'.png');
+    });
+
+    $("#settingsall").click(() => $("#settingsexport").select());
+    $("#importsettings").click(settingsImport);
+    $("#savetxt").click(downloadtxt);
+    $(".i18_close").click(() => window.close());
 });
-function keyhandle(keypressed) {
-	keypressed = keypressed.toUpperCase();
-	if ($("#hotkey").attr('disabled')) {
-		if (keypressed != $("#hotkey").val()) {
-			$("#paranoidhotkey").val(keypressed).attr('disabled', 'true');
-			$("#paranoidhotkeyrecord").val(chrome.i18n.getMessage("hotkey_record"));
-			saveOptions();
-		}
-	} else {
-		if (keypressed != $("#paranoidhotkey").val()) {
-			$("#hotkey").val(keypressed).attr('disabled', 'true');
-			$("#hotkeyrecord").val(chrome.i18n.getMessage("hotkey_record"));
-			saveOptions();
-		}
-	}
-}
-function loadCheckbox(id) {
-	document.getElementById(id).checked = typeof localStorage[id] == "undefined" ? false : localStorage[id] == "true";
+
+// =================================================================
+// ⭐️ CORE DATA FUNCTIONS (REFACTORED) ⭐️
+// =================================================================
+
+// CHANGED: Replaced all individual load/save functions with two core async functions.
+async function loadOptions() {
+    document.title = chrome.i18n.getMessage("dpoptions");
+    i18load();
+
+    const settings = await chrome.storage.local.get(DEFAULT_SETTINGS);
+
+    // Populate UI from the single settings object
+    $("#enable").prop('checked', settings.enable);
+    $("#global").prop('checked', settings.global);
+    $("#enableToggle").prop('checked', settings.enableToggle);
+    $("#hotkey").val(settings.hotkey.toUpperCase());
+    $("#paranoidhotkey").val(settings.paranoidhotkey.toUpperCase());
+    $("#newPages").val(settings.newPages);
+    $("#sfwmode").val(settings.sfwmode);
+    $("#opacity1").val(settings.opacity1);
+    $("#opacity2").val(settings.opacity2);
+    $("#collapseimage").prop('checked', settings.collapseimage);
+    $("#showIcon").prop('checked', settings.showIcon);
+    $("#iconType").val(settings.iconType);
+    $("#iconTitle").val(settings.iconTitle);
+    $("#disableFavicons").prop('checked', settings.disableFavicons);
+    $("#hidePageTitles").prop('checked', settings.hidePageTitles);
+    $("#pageTitleText").val(settings.pageTitleText);
+    $("#maxwidth").val(settings.maxwidth);
+    $("#maxheight").val(settings.maxheight);
+    $("#enableStickiness").prop('checked', settings.enableStickiness);
+    $("#showContext").prop('checked', settings.showContext);
+    $("#showUnderline").prop('checked', settings.showUnderline);
+    $("#removeBold").prop('checked', settings.removeBold);
+    $("#showUpdateNotifications").prop('checked', settings.showUpdateNotifications);
+    $("#font").val(settings.font);
+    $("#customfont").val(settings.customfont);
+    $("#fontsize").val(settings.fontsize);
+    $("#s_text").val(settings.s_text);
+    $("#s_bg").val(settings.s_bg);
+    $("#s_table").val(settings.s_table);
+    $("#s_link").val(settings.s_link);
+    $("#customcss").val(settings.customcss);
+
+    oldglobalstate = settings.global;
+
+    // Update UI visibility based on loaded settings
+    updateUIVisibility();
+    await listUpdate();
+    updateDemo();
+    opacitytest();
 }
 
-function loadElement(id) {
-	$("#"+id).val(localStorage[id]);
+async function saveOptions() {
+    // Create a settings object from all the UI elements
+    const settings = {
+        enable: $("#enable").is(':checked'),
+        global: $("#global").is(':checked'),
+        enableToggle: $("#enableToggle").is(':checked'),
+        hotkey: $("#hotkey").val() || 'CTRL F12',
+        paranoidhotkey: $("#paranoidhotkey").val() || 'ALT P',
+        newPages: $("#newPages").val(),
+        sfwmode: $("#sfwmode").val(),
+        opacity1: $("#opacity1").val(),
+        opacity2: $("#opacity2").val(),
+        collapseimage: $("#collapseimage").is(':checked'),
+        showIcon: $("#showIcon").is(':checked'),
+        iconType: $("#iconType").val(),
+        iconTitle: $("#iconTitle").val(),
+        disableFavicons: $("#disableFavicons").is(':checked'),
+        hidePageTitles: $("#hidePageTitles").is(':checked'),
+        pageTitleText: $("#pageTitleText").val() || 'Google Chrome',
+        maxwidth: $("#maxwidth").val(),
+        maxheight: $("#maxheight").val(),
+        enableStickiness: $("#enableStickiness").is(':checked'),
+        showContext: $("#showContext").is(':checked'),
+        showUnderline: $("#showUnderline").is(':checked'),
+        removeBold: $("#removeBold").is(':checked'),
+        showUpdateNotifications: $("#showUpdateNotifications").is(':checked'),
+        font: $("#font").val(),
+        customfont: $("#customfont").val(),
+        fontsize: $("#fontsize").val(),
+        s_text: $("#s_text").val(),
+        s_bg: $("#s_bg").val(),
+        s_table: $("#s_table").val(),
+        s_link: $("#s_link").val(),
+        customcss: $("#customcss").val().replace(/\s*<([^>]+)>\s*/ig, "")
+    };
+
+    // Save the single object
+    await chrome.storage.local.set(settings);
+
+    // CHANGED: Use async messaging instead of the old way.
+    chrome.runtime.sendMessage({ action: "optionsSaved", oldGlobalState: oldglobalstate, newGlobalState: settings.global });
+    chrome.runtime.sendMessage({ action: "hotkeyChange" });
+    
+    updateUIVisibility();
+    updateDemo();
+    notification(chrome.i18n.getMessage("saved"));
 }
 
-function saveCheckbox(id) {
-	localStorage[id] = document.getElementById(id).checked;
+// =================================================================
+// 📝 LIST MANAGEMENT FUNCTIONS (REFACTORED) 📝
+// =================================================================
+
+async function addList(type) {
+    const domain = $('#url').val().toLowerCase();
+    if (!domain.match(/^(?:[\-\w\*\?]+(\.[\-\w\*\?]+)*|((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[0-9]{1,2})\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[0-9]{1,2})|\[[A-Fa-f0-9:.]+\])?$/g)) {
+        notification(chrome.i18n.getMessage("invaliddomain"));
+        return;
+    }
+    
+    const { whiteList, blackList } = await chrome.storage.local.get(["whiteList", "blackList"]);
+    const list = (type === 0) ? whiteList : blackList;
+    const key = (type === 0) ? "whiteList" : "blackList";
+
+    if (!list.includes(domain)) {
+        list.push(domain);
+        await chrome.storage.local.set({ [key]: list });
+    }
+
+    $('#url').val('');
+    notification([chrome.i18n.getMessage("whitelisted"),chrome.i18n.getMessage("blacklisted")][type]+' '+domain+'.');
+    await listUpdate();
+    $('#url').focus();
 }
 
-function saveElement(id) {
-	localStorage[id] = $("#"+id).val();
+async function domainRemover(domain) {
+    const { whiteList, blackList } = await chrome.storage.local.get(["whiteList", "blackList"]);
+    
+    const newWhiteList = whiteList.filter(item => item !== domain);
+    const newBlackList = blackList.filter(item => item !== domain);
+
+    await chrome.storage.local.set({ whiteList: newWhiteList, blackList: newBlackList });
+    await listUpdate();
 }
-function closeOptions() {
-	window.open('', '_self', '');window.close();
+
+async function listUpdate() {
+    const { whiteList, blackList } = await chrome.storage.local.get(["whiteList", "blackList"]);
+
+    const renderList = (list, message) => {
+        if (list.length === 0) return `[${chrome.i18n.getMessage("empty")}]`;
+        return list.sort().map(item => 
+            `<div class="listentry">${item} <a href="#" style="color:#f00;float:right;" data-domain="${item}" class="domainRemover">X</a></div>`
+        ).join('');
+    };
+
+    $('#whitelist').html(renderList(whiteList));
+    $('#blacklist').html(renderList(blackList));
+    
+    $(".domainRemover").off('click').on('click', function(e) { 
+        e.preventDefault();
+        domainRemover($(this).data('domain'));
+    });
+    
+    // CHANGED: Use async messaging instead of the old way.
+    chrome.runtime.sendMessage({ action: "initLists" });
 }
-function settingsall() {
-	selectAll('settingsexport');
+
+async function listclear(type) {
+    const key = (type === 0) ? "whiteList" : "blackList";
+    const msg = (type === 0) ? "removefromwhitelist" : "removefromblacklist";
+
+    if (confirm(chrome.i18n.getMessage(msg) + '?')) {
+        await chrome.storage.local.set({ [key]: [] });
+        await listUpdate();
+    }
 }
-function selectAll(id) {
-	$("#"+id).select();
+
+// =================================================================
+// ⚙️ IMPORT/EXPORT FUNCTIONS (REFACTORED) ⚙️
+// =================================================================
+
+async function downloadtxt() {
+    // CHANGED: Export is now a clean JSON of the entire settings object.
+    const settings = await chrome.storage.local.get(DEFAULT_SETTINGS);
+    const textToWrite = JSON.stringify(settings, null, 2); // Pretty-printed JSON
+    const textFileAsBlob = new Blob([textToWrite], {type:'application/json'});
+    const fileNameToSaveAs = `dp-settings-${new Date().toJSON().slice(0,10)}.json`;
+    
+    const downloadLink = document.createElement("a");
+    downloadLink.download = fileNameToSaveAs;
+    downloadLink.href = window.URL.createObjectURL(textFileAsBlob);
+    downloadLink.click();
+    downloadLink.remove();
+}
+
+async function settingsImport() {
+    const settingsJSON = $("#settingsimport").val();
+    if (!settingsJSON.trim()) {
+        notification(chrome.i18n.getMessage("pastesettings"));
+        return;
+    }
+
+    try {
+        // CHANGED: Simply parse the JSON and save it. Much more robust.
+        const importedSettings = JSON.parse(settingsJSON);
+        // Basic validation: check if a key from our defaults exists
+        if (typeof importedSettings.enable === 'undefined') {
+            throw new Error("Invalid settings file.");
+        }
+        await chrome.storage.local.set(importedSettings);
+        await loadOptions(); // Reload the whole UI with new settings
+        notification(chrome.i18n.getMessage("importsuccessoptions"));
+        $("#settingsimport").val("");
+    } catch (e) {
+        notification("Error: Invalid settings file. Please use a valid JSON export.");
+    }
+}
+
+// =================================================================
+// 🎨 UI & HELPER FUNCTIONS (Mostly unchanged, some async) 🎨
+// =================================================================
+
+function updateUIVisibility() {
+    // This function can be called after loading or saving to keep UI consistent.
+    $('#global').is(':checked') ? $("#newPagesRow").hide() : $("#newPagesRow").show();
+    $('#enableToggle').is(':checked') ? $("#hotkeyrow, #paranoidhotkeyrow").show() : $("#hotkeyrow, #paranoidhotkeyrow").hide();
+    $('#hidePageTitles').is(':checked') ? $("#pageTitle").show() : $("#pageTitle").hide();
+    $('#showIcon').is(':checked') ? $(".discreeticonrow").show() : $(".discreeticonrow").hide();
+    const sfwMode = $('#sfwmode').val();
+    (sfwMode === 'SFW' || sfwMode === 'SFW1' || sfwMode === 'SFW2') ? $("#opacityrow").fadeIn("fast") : $("#opacityrow").hide();
+    $('#font').val() === '-Custom-' ? $("#customfontrow").show() : $("#customfontrow").hide();
+}
+
+
+async function revertColours() {
+    // CHANGED: Made async to get data from storage.
+    const settings = await chrome.storage.local.get(['s_bg', 's_text', 's_link', 's_table']);
+    $('#s_bg').val(settings.s_bg);
+    $('#s_text').val(settings.s_text);
+    $('#s_link').val(settings.s_link);
+    $('#s_table').val(settings.s_table);
+    updateDemo();
 }
 function i18load() {
 	$("#title").html("Decreased Productivity v"+version);
@@ -222,132 +383,6 @@ function i18load() {
 	$("#customcssdesc").html(chrome.i18n.getMessage("customcss"));
 	$(".i18_supportimg").attr({alt: chrome.i18n.getMessage("support"), title:  chrome.i18n.getMessage("support")});
 }
-function loadOptions() {
-	document.title = chrome.i18n.getMessage("dpoptions");
-	i18load();
-	oldglobalstate = localStorage["global"];
-	loadCheckbox("enable");
-	loadCheckbox("global");
-	loadCheckbox("enableToggle");
-	loadElement("hotkey");
-	loadElement("paranoidhotkey");
-	if ($("#hotkey").val()) $("#hotkey").val($("#hotkey").val().toUpperCase());
-	if ($("#paranoidhotkey").val()) $("#paranoidhotkey").val($("#paranoidhotkey").val().toUpperCase());
-	loadElement("newPages");
-	loadElement("sfwmode");
-	loadElement("opacity1");
-	loadElement("opacity2");
-	loadCheckbox("collapseimage");
-	loadCheckbox("showIcon");
-	loadElement("iconType");
-	loadElement("iconTitle");
-	loadCheckbox("disableFavicons");
-	loadCheckbox("hidePageTitles");
-	loadElement("pageTitleText");
-	loadElement("maxwidth");
-	loadElement("maxheight");
-	loadCheckbox("enableStickiness");
-	loadCheckbox("showContext");
-	loadCheckbox("showUnderline");
-	loadCheckbox("removeBold");
-	loadCheckbox("showUpdateNotifications");
-	loadElement("font");
-	loadElement("customfont");
-	loadElement("fontsize");
-	loadElement("s_text");
-	loadElement("s_bg");
-	loadElement("s_table");
-	loadElement("s_link");
-	if ($('#global').is(':checked')) $("#newPagesRow").css('display', 'none');
-	if ($('#showIcon').is(':checked')) $(".discreeticonrow").show();
-	if ($('#enableToggle').is(':checked')) $("#hotkeyrow, #paranoidhotkeyrow").show();
-	$("#sampleicon").attr('src', '../img/addressicon/'+$('#iconType').val()+'.png');
-	if (!$('#hidePageTitles').is(':checked')) $("#pageTitle").css('display', 'none');
-	if ($('#opacity1').val() == 0) $("#collapseimageblock").css('display', 'block');
-	if ($('#sfwmode').val() == 'SFW' || $('#sfwmode').val() == 'SFW1' || $('#sfwmode').val() == 'SFW2') $("#opacityrow").show();
-	if ($('#font').val() == '-Custom-') {
-		if ($("#customfont").val()) $("#customfontrow").show();
-		else {
-			$('#font').val('Arial');
-			$("#customfontrow").hide();
-		}
-	}
-	loadElement("customcss");
-	listUpdate();
-	opacitytest();
-	updateDemo();
-}
-function isValidColor(hex) { 
-	var strPattern = /^[0-9a-f]{3,6}$/i; 
-	return strPattern.test(hex); 
-}
-
-function saveOptions() {
-	updateDemo();
-	if (!$('#enable').is(':checked') && !$('#global').is(':checked')) {
-		$('#enable').prop('checked', true);
-	}
-	if ($('#global').is(':checked')) $("#newPagesRow").css('display', 'none');
-	else $("#newPagesRow").css('display', 'block');
-	if ($('#enableToggle').is(':checked')) $("#hotkeyrow, #paranoidhotkeyrow").show();
-	else $("#hotkeyrow, #paranoidhotkeyrow").hide();
-	if ($('#hidePageTitles').is(':checked')) $("#pageTitle").css('display', 'block');
-	else $("#pageTitle").css('display', 'none');
-	if ($('#sfwmode').val() == 'SFW' || $('#sfwmode').val() == 'SFW1' || $('#sfwmode').val() == 'SFW2') $("#opacityrow").fadeIn("fast");
-	else $("#opacityrow").hide();
-	if ($('#font').val() == '-Custom-') $("#customfontrow").show();
-	else $("#customfontrow").hide();
-	if (!$("#hotkey").val()) $("#hotkey").val('CTRL F12');
-	if (!$("#paranoidhotkey").val()) $("#paranoidhotkey").val('ALT P');
-	saveCheckbox("enable");
-	saveCheckbox("global");
-	saveCheckbox("enableToggle");
-	saveElement("hotkey");
-	saveElement("paranoidhotkey");
-	saveElement("opacity1");
-	saveElement("opacity2");
-	saveCheckbox("collapseimage");
-	saveElement("newPages");
-	saveElement("sfwmode");
-	saveCheckbox("showIcon");
-	saveElement("iconType");
-	saveElement("iconTitle");
-	saveCheckbox("disableFavicons");
-	saveCheckbox("hidePageTitles");
-	saveElement("pageTitleText");
-	saveElement("maxwidth");
-	saveElement("maxheight");
-	saveCheckbox("enableStickiness");
-	saveCheckbox("showContext");
-	saveCheckbox("showUnderline");
-	saveCheckbox("removeBold");
-	saveCheckbox("showUpdateNotifications");
-	saveElement("font");
-	saveElement("customfont");
-	saveElement("fontsize");
-	if ($('#showIcon').is(':checked')) {
-		$(".discreeticonrow").show();
-		bkg.setDPIcon();
-	} else $(".discreeticonrow").hide();
-	if (isValidColor($('#s_text').val()) && isValidColor($('#s_bg').val()) && isValidColor($('#s_table').val()) && isValidColor($('#s_link').val())) {
-		saveElement("s_text");
-		saveElement("s_bg");
-		saveElement("s_table");
-		saveElement("s_link");
-	} else {
-		error = true;
-	}
-	$("#customcss").val($("#customcss").val().replace(/\s*<([^>]+)>\s*/ig, ""));
-	saveElement("customcss");
-	updateExport();
-	// Apply new settings
-	bkg.optionsSaveTrigger(oldglobalstate, localStorage["global"]);
-	bkg.hotkeyChange();
-	oldglobalstate = localStorage["global"];
-	// Remove any existing styling
-	if (!error) notification(chrome.i18n.getMessage("saved"));
-	else notification(chrome.i18n.getMessage("invalidcolour"));
-}
 
 function opacitytest() {
 	$("#o1").slider("option", "value", $("#opacity1").val());
@@ -363,36 +398,10 @@ function opacitytest() {
 	);
 }	
 
-function intValidate(elm, val) {
-	if (!is_int(elm.value)) {
-		notification(chrome.i18n.getMessage("invalidnumber"));
-		elm.value = val;
-	}
-	else saveOptions();
-}
-
-function is_int(value){ 
-	if(value != '' && !isNaN(value)) return true;
-	else return false;
-}	
-
-function pageTitleValidation() {
-	if ($.trim($("#pageTitleText").val()) == '') $("#pageTitleText").val('Google Chrome');
-	else saveOptions();
-}
-
-function fontsizeValidation() {
-	if (!is_int($.trim($("#fontsize").val()))) $("#fontsize").val('12');
-	updateDemo();
-}
-
 function notification(msg) {
 	$('#message').html(msg).stop().fadeIn("slow").delay(2000).fadeOut("slow")
 }
-function truncText(str) {
-	if (str.length > 16) return str.substr(0, 16)+'...';
-	return str;
-}
+
 function updateDemo() {
 	if ($('#disableFavicons').is(':checked')) $("#demo_favicon").attr('style','visibility: hidden');
 	else $("#demo_favicon").removeAttr('style');
@@ -483,67 +492,6 @@ function stylePreset(s) {
 	}
 }
 
-// <!-- modified from KB SSL Enforcer: https://code.google.com/p/kbsslenforcer/
-function addList(type) {
-	var domain = $('#url').val();
-	domain = domain.toLowerCase();
-	
-	if (!domain.match(/^(?:[\-\w\*\?]+(\.[\-\w\*\?]+)*|((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[0-9]{1,2})\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[0-9]{1,2})|\[[A-Fa-f0-9:.]+\])?$/g)) {
-		$('#listMsg').html(chrome.i18n.getMessage("invaliddomain")).stop().fadeIn("slow").delay(2000).fadeOut("slow");
-	} else {
-		bkg.domainHandler(domain, type);
-		$('#url').val('');
-		$('#listMsg').html([chrome.i18n.getMessage("whitelisted"),chrome.i18n.getMessage("blacklisted")][type]+' '+domain+'.').stop().fadeIn("slow").delay(2000).fadeOut("slow");
-		listUpdate();
-		$('#url').focus();
-	}
-	return false;
-}
-function domainRemover(domain) {
-	bkg.domainHandler(domain,2);
-	listUpdate();
-	return false;
-}
-function listUpdate() {
-	var whiteList = JSON.parse(localStorage['whiteList']);
-	var blackList = JSON.parse(localStorage['blackList']);
-	
-	var whitelistCompiled = '';
-	if(whiteList.length==0) whitelistCompiled = '['+chrome.i18n.getMessage("empty")+']';
-	else {
-		whiteList.sort();
-		for(i in whiteList) whitelistCompiled += '<div class="listentry">'+whiteList[i]+' <a href="javascript:;" style="color:#f00;float:right;" rel="'+whiteList[i]+'" class="domainRemover">X</a></div>';
-	}
-	var blacklistCompiled = '';
-	if (blackList.length==0) blacklistCompiled = '['+chrome.i18n.getMessage("empty")+']';
-	else {
-		blackList.sort();
-		for(i in blackList) blacklistCompiled += '<div class="listentry">'+blackList[i]+' <a href="javascript:;" style="color:#f00;float:right;" rel="'+blackList[i]+'" class="domainRemover">X</a></div>';
-	}
-	$('#whitelist').html(whitelistCompiled);
-	$('#blacklist').html(blacklistCompiled);
-	$(".domainRemover").unbind('click');
-	$(".domainRemover").click(function() { domainRemover($(this).attr('rel'));});
-	bkg.initLists();
-	updateExport();
-}
-function listclear(type) {
-	if (confirm([chrome.i18n.getMessage("removefromwhitelist"),chrome.i18n.getMessage("removefromblacklist")][type]+'?')) {
-		localStorage[['whiteList','blackList'][type]] = JSON.stringify([]);
-		listUpdate();
-	}
-	return false;
-}
-// from KB SSL Enforcer: https://code.google.com/p/kbsslenforcer/ -->
-
-function revertColours(s) {
-	$('#s_bg').val(localStorage['s_bg']);
-	$('#s_text').val(localStorage['s_text']);
-	$('#s_link').val(localStorage['s_link']);
-	$('#s_table').val(localStorage['s_table']);
-	updateDemo();
-}
-
 function colorPickLoad(id) {
 	$('#'+id).ColorPicker({
 		onBeforeShow: function () {
@@ -554,62 +502,4 @@ function colorPickLoad(id) {
 			updateDemo();
 		}
 	});
-}
-
-function downloadtxt() {
-	var textToWrite = $("#settingsexport").val();
-	var textFileAsBlob = new Blob([textToWrite], {type:'text/plain'});
-	var fileNameToSaveAs = "dp-settings-"+new Date().toJSON()+".txt";
-	var downloadLink = document.createElement("a");
-	downloadLink.download = fileNameToSaveAs;
-	downloadLink.innerHTML = "Download File";
-	downloadLink.href = window.webkitURL.createObjectURL(textFileAsBlob);
-	downloadLink.click();
-	downloadLink.remove();
-}
-function updateExport() {
-	$("#settingsexport").val("");
-	settingnames = [];
-	for (var i in localStorage) {
-		if (localStorage.hasOwnProperty(i)) {
-			if (i != "version") {
-				settingnames.push(i);
-				$("#settingsexport").val($("#settingsexport").val()+i+"|"+localStorage[i].replace(/(?:\r\n|\r|\n)/g, ' ')+"\n");
-			}
-		}
-	}
-	$("#settingsexport").val($("#settingsexport").val().slice(0,-1));
-}
-function settingsImport() {
-	var error = "";
-	var settings = $("#settingsimport").val().split("\n");
-	if ($.trim($("#settingsimport").val()) == "") {
-		notification(chrome.i18n.getMessage("pastesettings"));
-		return false;
-	}
-	if (settings.length > 0) {
-		$.each(settings, function(i, v) {
-			if ($.trim(v) != "") {
-				var settingentry = $.trim(v).split("|");
-				if (settingnames.indexOf($.trim(settingentry[0])) != -1) {
-					if ($.trim(settingentry[0]) == 'whiteList' || $.trim(settingentry[0]) == 'blackList') {
-						var listarray = $.trim(settingentry[1]).replace(/(\[|\]|")/g,"").split(",");
-						if ($.trim(settingentry[0]) == 'whiteList' && listarray.toString() != '') localStorage['whiteList'] = JSON.stringify(listarray);
-						else if ($.trim(settingentry[0]) == 'blackList' && listarray.toString() != '') localStorage['blackList'] = JSON.stringify(listarray);
-					} else 
-						localStorage[$.trim(settingentry[0])] = $.trim(settingentry[1]);
-				} else {
-					error += $.trim(settingentry[0])+", ";
-				}
-			}
-		});
-	}
-	loadOptions();
-	listUpdate();
-	if (!error) {
-		notification(chrome.i18n.getMessage("importsuccessoptions"));
-		$("#settingsimport").val("");
-	} else {
-		notification(chrome.i18n.getMessage("importsuccesscond")+error.slice(0, -2));
-	}
 }
