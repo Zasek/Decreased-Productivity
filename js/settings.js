@@ -13,6 +13,7 @@ const DEFAULT_SETTINGS = {
     opacity1: 0.05,
     opacity2: 0.5,
     collapseimage: false,
+    colorbackground: 'FFFFFF',
     showIcon: true,
     iconType: 'coffee',
     iconTitle: 'Decreased Productivity',

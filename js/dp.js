@@ -63,7 +63,7 @@
 
     function addCloak(settings) {
         
-        let { sfwmode: sfw, font: f, fontsize: fsize, underline: u, background: bg, s_text: text, s_table: table, s_link: link, bold, opacity1: o1, opacity2: o2, collapseimage: collapseimage, customcss: customcss } = settings;
+        let { sfwmode: sfw, font: f, fontsize: fsize, underline: u, colorbackground: bg, s_text: text, s_table: table, s_link: link, bold, opacity1: o1, opacity2: o2, collapseimage: collapseimage, customcss: customcss } = settings;
         
         const cssinject = document.createElement("style");
         cssinject.setAttribute("__decreased__", "productivity");
@@ -183,6 +183,7 @@
                 jQuery(this).removeClass('dp'+timestamp+'_visible dp'+timestamp+'_unbold dp'+timestamp+'_link dp'+timestamp+'_text dp'+timestamp+'_hide').removeAttr("__decreased__");
             });
         }
+        console.log(`magic: ${magic}`);
         cssinject.innerText = magic;
         document.documentElement.appendChild(cssinject);
         document.querySelectorAll('style[__decreased__="initialstealth"]').forEach(el => el.remove());

@@ -86,6 +86,7 @@ async function loadOptions() {
     $("#opacity1").val(settings.opacity1);
     $("#opacity2").val(settings.opacity2);
     $("#collapseimage").prop('checked', settings.collapseimage);
+    $("#colorbackground").prop (settings.colorbackground);
     $("#showIcon").prop('checked', settings.showIcon);
     $("#iconType").val(settings.iconType);
     $("#iconTitle").val(settings.iconTitle);
@@ -130,6 +131,7 @@ async function saveOptions() {
         opacity1: $("#opacity1").val(),
         opacity2: $("#opacity2").val(),
         collapseimage: $("#collapseimage").is(':checked'),
+        colorbackground: $("#colorbackground").val(),
         showIcon: $("#showIcon").is(':checked'),
         iconType: $("#iconType").val(),
         iconTitle: $("#iconTitle").val(),
