@@ -18,7 +18,7 @@ function extractDomainFromURL(url) {
     if (url.indexOf("/") != -1) url = url.substr(0, url.indexOf("/"));
     if (url.indexOf("@") != -1) url = url.substr(url.indexOf("@") + 1);
     if (url.match(/^(?:\[[A-Fa-f0-9:.]+\])(:[0-9]+)?$/g)) {
-        if (url.indexOf("]:") != -1) return url.substr(0, url.indexOf("]:")+1);
+        if (url.indexOf("]:") != -1) return url.substr(0, url.indexOf("]:") + 1);
         return url;
     }
     if (url.indexOf(":") > 0) url = url.substr(0, url.indexOf(":"));
@@ -33,7 +33,7 @@ function in_array(needle, haystack) {
     }
     for (var i in haystack) {
         if (haystack[i].indexOf("*") == -1 && haystack[i].indexOf("?") == -1) continue;
-        if (new RegExp('^(?:www\\.|^)(?:'+haystack[i].replace(/\./g, '\\.').replace(/^\[/, '\\[').replace(/\]$/, '\\]').replace(/\?/g, '.').replace(/\*/g, '[^.]+')+')').test(needle)) return '1';
+        if (new RegExp('^(?:www\\.|^)(?:' + haystack[i].replace(/\./g, '\\.').replace(/^\[/, '\\[').replace(/\]$/, '\\]').replace(/\?/g, '.').replace(/\*/g, '[^.]+') + ')').test(needle)) return '1';
     }
     return false;
 }
@@ -80,7 +80,7 @@ async function enabled(tab, dpcloakindex) {
 async function domainCheck(domain) {
     if (!domain) return '-1';
     const { whiteList, blackList } = await chrome.storage.local.get(["whiteList", "blackList"]);
-    
+
     // Sort lists for binary search, as they are no longer presorted in a global var.
     whiteList.sort();
     blackList.sort();
@@ -179,7 +179,7 @@ async function recursiveCloak(shouldEnable, isGlobalToggle) {
 
     for (const tab of tabs) {
         const domainStatus = await domainCheck(extractDomainFromURL(tab.url));
-        if (domainStatus === '1') { 
+        if (domainStatus === '1') {
             // blacklist
             await magician(true, tab.id);
         } else if (domainStatus === '0') {
@@ -265,8 +265,8 @@ const messageDispatchTable = {
         let { sfwmode, savedsfwmode, global } = await chrome.storage.local.get(['sfwmode', 'savedsfwmode', 'global']);
         if (savedsfwmode === "") {
             await chrome.storage.local.set({ savedsfwmode: sfwmode, sfwmode: "Paranoid", enable: true });
-             if (global) await recursiveCloak(true, true);
-             else {
+            if (global) await recursiveCloak(true, true);
+            else {
                 await magician(true, sender.tab.id);
                 const dpTabId = sender.tab.windowId + "|" + sender.tab.id;
                 if (!cloakedTabs.includes(dpTabId)) cloakedTabs.push(dpTabId);
@@ -365,27 +365,45 @@ chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
 
 // CHANGED: Replaced `setDefaultOptions` with a more robust initialization.
 async function initializeExtension() {
-    const settings = await chrome.storage.local.get(DEFAULT_SETTINGS);
-    if (settings.version === version) {
-        console.log("Decreased Productivity is already initialized.");
-        return;
-    }
-    
+    // Get existing settings. If a key is missing in storage, it returns the value from DEFAULT_SETTINGS (the argument).
+    // But we want to know what is ACTUALLY in storage vs what is default.
+    // Actually, chrome.storage.local.get(defaults) returns the defaults merged with storage.
+    // So 'settings' here ALREADY contains the merged result of (defaults + storage).
+    // Wait, if I do get(DEFAULT_SETTINGS), it returns an object with all keys.
+    // If I then do set({...settings, ...DEFAULT_SETTINGS}), I am overwriting with defaults again if I am not careful?
+    // No, wait.
+    // If storage has { enable: false } and DEFAULT has { enable: true }.
+    // get(DEFAULT) returns { enable: false }.
+    // Then {...settings} is { enable: false }.
+    // {...DEFAULT_SETTINGS} is { enable: true }.
+    // So {...settings, ...DEFAULT_SETTINGS} results in { enable: true } (WRONG!).
+    // It MUST be {...DEFAULT_SETTINGS, ...settings}.
+
+    // However, since we used get(DEFAULT_SETTINGS), 'settings' already has all the keys from DEFAULT_SETTINGS filled in with values from storage (or default if missing).
+    // So simply saving 'settings' back is mostly fine, EXCEPT if we want to ensure new keys from a new version are added.
+
+    // Correct logic:
+    // 1. Get EVERYTHING from storage (no defaults).
+    const stored = await chrome.storage.local.get(null);
+
+    // 2. Merge: Defaults -> Stored -> Version update
+    const finalSettings = { ...DEFAULT_SETTINGS, ...stored, version: version };
+
     console.log("Initializing Decreased Productivity...");
-    
-    // Set all default values for any keys that might be missing
-    await chrome.storage.local.set({ ...settings, ...DEFAULT_SETTINGS, version: version });
+
+    // 3. Save back
+    await chrome.storage.local.set(finalSettings);
 
     // Set up the context menus
-    if (settings.showContext) {
+    if (finalSettings.showContext) {
         setupContextMenus();
     }
-    
-    if (settings.showUpdateNotifications) {
+
+    if (finalSettings.showUpdateNotifications) {
         // You could open an update page here if it's a major version change.
         // chrome.tabs.create({ url: 'updated.html' });
     }
-    
+
     console.log("Initialization complete.");
 }
 
@@ -451,14 +469,15 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 chrome.runtime.onInstalled.addListener(async (details) => {
     // details.reason will tell us if it's "install" or "update"
     console.log(`Extension event: ${details.reason}`);
-    await chrome.storage.local.set(DEFAULT_SETTINGS);
-    setupContextMenus();
+
+    // CHANGED: Do NOT unconditionally reset settings.
+    // await chrome.storage.local.set(DEFAULT_SETTINGS); <-- REMOVED
+
+    await initializeExtension();
 
     const settings = await chrome.storage.local.get(DEFAULT_SETTINGS);
     if (settings.showUpdateNotifications && details.reason === "update") {
-         // Open only when updated
-         // chrome.tabs.create({ url: 'updated.html' });
+        // Open only when updated
+        // chrome.tabs.create({ url: 'updated.html' });
     }
-
-    console.log("Initialization complete.");
 });
